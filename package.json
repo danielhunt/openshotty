@@ -1,0 +1,22 @@
+{
+  "name": "monster-hunt-ar",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Monster Hunt AR - a pocket monster-catching adventure that lives in your house.",
+  "scripts": {
+    "dev": "vite --host",
+    "typecheck": "tsc --noEmit",
+    "icons": "node scripts/gen-icons.mjs",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host"
+  },
+  "dependencies": {
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.187.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5"
+  }
+}

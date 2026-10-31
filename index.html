@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Monster Hunt AR</title>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#1b1140" />
+    <meta name="description" content="Monster Hunt AR — friendly monsters are hiding in your house. Find them, befriend them, collect them all!" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Monster Hunt" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="./favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="./icon-180.png" />
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <!-- ============ AR BACKGROUND (live camera) ============ -->
+    <video id="camera-feed" playsinline muted autoplay disablepictureinpicture></video>
+    <div id="dream-fallback" aria-hidden="true"></div>
+    <div id="scrim" aria-hidden="true"></div>
+
+    <!-- ============ 3D WORLD ============ -->
+    <canvas id="gl"></canvas>
+    <div id="vignette" aria-hidden="true"></div>
+    <div id="labels" aria-hidden="true"></div>
+
+    <!-- ============ FX LAYERS ============ -->
+    <div id="flash" aria-hidden="true"></div>
+    <div id="confetti" aria-hidden="true"></div>
+    <div id="toasts" aria-live="polite"></div>
+
+    <!-- ============ HUD ============ -->
+    <div id="hud" class="layer hidden">
+      <div class="hud-top">
+        <div class="hud-top-row">
+          <div class="chip chip-level" id="level-chip">
+            <div class="ring"><svg viewBox="0 0 36 36"><circle class="ring-bg" cx="18" cy="18" r="15.5" /><circle class="ring-fg" id="xp-ring" cx="18" cy="18" r="15.5" /></svg><span id="level-num">1</span></div>
+            <div class="chip-text"><b id="rank-name">Tiny Scout</b><small id="xp-text">0 / 40 sparkle</small></div>
+          </div>
+          <div class="hud-top-right">
+            <button class="icon-btn" id="btn-sound" title="Sound"><span>🔊</span></button>
+            <button class="icon-btn" id="btn-book" title="My monsters"><span>📖</span></button>
+            <button class="icon-btn" id="btn-settings" title="Settings"><span>⚙️</span></button>
+          </div>
+        </div>
+        <!-- up here on purpose: down there is where the monsters live, and a
+             nearby creature used to stand directly behind the detector bar -->
+        <div class="radar">
+          <div class="radar-ticks"></div>
+          <div class="radar-blips" id="radar-blips"></div>
+          <div class="radar-center"></div>
+        </div>
+      </div>
+
+      <div class="hud-center">
+        <div id="reticle" class="reticle">
+          <svg viewBox="0 0 120 120">
+            <circle class="ret-ring" cx="60" cy="60" r="40" />
+            <circle class="ret-lock" id="ret-lock" cx="60" cy="60" r="40" pathLength="100" />
+            <path class="ret-tick" d="M60 6 v10 M60 104 v10 M6 60 h10 M104 60 h10" />
+          </svg>
+        </div>
+        <div id="lock-plate" class="lock-plate hidden">
+          <div class="lock-name" id="lock-name">Bloop</div>
+          <div class="lock-meta"><span class="badge" id="lock-element">Aqua</span><span id="lock-dist">10 steps</span></div>
+        </div>
+      </div>
+
+      <div class="hud-bottom">
+        <div class="hud-actions">
+          <button class="action-btn orb-btn" id="btn-throw">
+            <span class="orb-icon"></span>
+            <span class="action-label">Capture!</span>
+            <span class="orb-count" id="orb-count">20</span>
+          </button>
+          <button class="action-btn roar-btn" id="btn-roar">
+            <span class="roar-icon">📣</span>
+            <span class="action-label">Roar!</span>
+          </button>
+        </div>
+        <div class="hint-strip" id="hint-strip">Look around — monsters hide in corners!</div>
+      </div>
+    </div>
+
+    <!-- ============ TITLE ============ -->
+    <div id="screen-title" class="layer screen">
+      <div class="title-inner">
+        <div class="logo">
+          <span class="logo-word small">Monster</span>
+          <span class="logo-word big">HUNT</span>
+          <span class="logo-badge">AR</span>
+        </div>
+        <p class="tagline">Friendly monsters are hiding<br /><b>inside your house!</b></p>
+        <div class="title-hints">
+          <div class="hint"><span class="hint-ico">👀</span>Look around your room</div>
+          <div class="hint"><span class="hint-ico">🚶</span>Walk closer on your own feet</div>
+          <div class="hint"><span class="hint-ico">🎯</span>Tap to hurl your orb</div>
+          <div class="hint"><span class="hint-ico">📣</span>Roar to call them out</div>
+        </div>
+        <button class="big-btn" id="btn-play"><span>PLAY</span></button>
+        <button class="ghost-btn" id="btn-title-settings">Grown-ups</button>
+      </div>
+    </div>
+
+    <!-- ============ PERMISSIONS ============ -->
+    <div id="screen-perms" class="layer screen hidden">
+      <div class="panel">
+        <div class="panel-crest">🏠✨</div>
+        <h2>Let the monsters in?</h2>
+        <p class="panel-body">Monster Hunt needs your <b>camera</b> and your phone's <b>motion</b> so monsters can hide in your room. Nothing is saved or sent anywhere — everything stays on this phone.</p>
+        <ul class="perm-list">
+          <li><span>🎥</span> Camera shows your room</li>
+          <li><span>🧭</span> Motion looks around</li>
+          <li><span>🚶</span> Motion senses your steps</li>
+        </ul>
+        <button class="big-btn" id="btn-allow"><span>Let them in!</span></button>
+        <button class="ghost-btn" id="btn-deny">Just pretend-play (no camera)</button>
+      </div>
+    </div>
+
+    <!-- ============ CALIBRATION ============ -->
+    <div id="screen-calibrate" class="layer screen hidden">
+      <div class="panel panel-slim">
+        <div class="cal-anim"><div class="cal-phone">📱</div><div class="cal-sweep"></div></div>
+        <h2 id="cal-title">Stand where you want<br />the adventure to start</h2>
+        <p class="panel-body" id="cal-body">Point your phone straight ahead, then tap the button. Monsters will appear around this spot.</p>
+        <button class="big-btn" id="btn-calibrate"><span>Start hunting!</span></button>
+        <div class="cal-meter"><div class="cal-meter-fill" id="cal-fill"></div></div>
+      </div>
+    </div>
+
+    <!-- ============ COLLECTION ============ -->
+    <div id="screen-collection" class="layer screen panel-screen hidden">
+      <header class="page-head">
+        <button class="icon-btn" id="btn-close-collection"><span>✕</span></button>
+        <h2>My Monsters</h2>
+        <div class="head-stat"><b id="coll-count">0</b><small>of <span id="coll-total">0</span></small></div>
+      </header>
+      <div class="coll-progress"><div class="coll-progress-fill" id="coll-fill"></div></div>
+      <div class="coll-reward-note" id="coll-note">Find 3 monsters to earn the Golden Orb!</div>
+      <div class="coll-grid" id="coll-grid"></div>
+    </div>
+
+    <!-- ============ MONSTER DETAIL ============ -->
+    <div id="screen-detail" class="layer screen panel-screen hidden">
+      <header class="page-head">
+        <button class="icon-btn" id="btn-close-detail"><span>✕</span></button>
+        <h2 id="detail-name">Monster</h2>
+        <button class="icon-btn fav-btn" id="btn-fav"><span>☆</span></button>
+      </header>
+      <div class="detail-stage">
+        <div id="detail-canvas-wrap"></div>
+        <div class="detail-orbit-hint">spin me!</div>
+      </div>
+      <div class="detail-body">
+        <div class="detail-badges" id="detail-badges"></div>
+        <p class="detail-fact" id="detail-fact"></p>
+        <div class="detail-stats" id="detail-stats"></div>
+        <button class="big-btn big-btn-small" id="btn-detail-call"><span>Call me here</span></button>
+      </div>
+    </div>
+
+    <!-- ============ CATCH RESULT ============ -->
+    <div id="screen-reward" class="layer screen hidden">
+      <div class="reward-card" id="reward-card">
+        <div class="reward-ribbon" id="reward-ribbon">NEW FRIEND!</div>
+        <div class="reward-glow"></div>
+        <div class="reward-canvas-wrap" id="reward-canvas"></div>
+        <div class="reward-name" id="reward-name">Bloop</div>
+        <div class="reward-sub"><span class="badge" id="reward-element">Aqua</span><span id="reward-rarity">Common</span></div>
+        <p class="reward-fact" id="reward-fact"></p>
+        <div class="reward-xp" id="reward-xp">+15 sparkle</div>
+        <button class="big-btn" id="btn-reward-close"><span>Woohoo!</span></button>
+      </div>
+    </div>
+
+    <!-- ============ SETTINGS ============ -->
+    <div id="screen-settings" class="layer screen hidden">
+      <div class="panel panel-scroll">
+        <header class="page-head page-head-plain">
+          <button class="icon-btn" id="btn-close-settings"><span>✕</span></button>
+          <h2>Grown-ups</h2>
+          <div></div>
+        </header>
+        <!-- only the rows scroll: the ✕ must never scroll away -->
+        <div class="panel-rows">
+            <div class="setting">
+            <label for="set-sfx">Sound effects</label>
+            <button class="toggle" id="set-sfx" role="switch"><span></span></button>
+          </div>
+          <div class="setting">
+            <label for="set-music">Music</label>
+            <button class="toggle" id="set-music" role="switch"><span></span></button>
+          </div>
+          <div class="setting">
+            <label for="set-voice">Read monster names out loud</label>
+            <button class="toggle" id="set-voice" role="switch"><span></span></button>
+          </div>
+          <div class="setting">
+            <label for="set-roar">Roar to summon monsters <small>(needs microphone)</small></label>
+            <button class="toggle" id="set-roar" role="switch"><span></span></button>
+          </div>
+          <div class="setting setting-range">
+            <label for="set-density">How many monsters hide here</label>
+            <input type="range" min="1" max="3" step="1" id="set-density" />
+            <div class="range-labels"><span>few</span><span>some</span><span>LOTS</span></div>
+          </div>
+          <div class="setting setting-range">
+            <label for="set-sensitivity">Walking detection</label>
+            <input type="range" min="0" max="2" step="1" id="set-sensitivity" />
+            <div class="range-labels"><span>off</span><span>normal</span><span>keen</span></div>
+          </div>
+          <div class="setting setting-range">
+            <label for="set-tilt">Looking-around speed</label>
+            <input type="range" min="0" max="2" step="1" id="set-tilt" />
+            <div class="range-labels"><span>slow</span><span>normal</span><span>zippy</span></div>
+          </div>
+          <div class="setting setting-range">
+            <label for="set-assist">Throwing help</label>
+            <input type="range" min="0" max="2" step="1" id="set-assist" />
+            <div class="range-labels"><span>a bit</span><span>normal</span><span>magic</span></div>
+          </div>
+          <p class="setting-note">Your phone's camera and microphone stay switched on while you play, so monsters can hide in your room. Nothing leaves this phone.</p>
+          <div class="setting-actions">
+            <button class="ghost-btn" id="btn-recenter">Face me straight ahead</button>
+            <button class="ghost-btn ghost-danger" id="btn-reset">Start a new adventure</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ LEVEL UP ============ -->
+    <div id="screen-levelup" class="layer screen hidden">
+      <div class="levelup">
+        <div class="levelup-star">⭐️</div>
+        <div class="levelup-num" id="levelup-num">2</div>
+        <div class="levelup-word">LEVEL UP!</div>
+        <div class="levelup-rank" id="levelup-rank">Brave Tracker</div>
+        <div class="levelup-prize" id="levelup-prize">+6 Capture Orbs</div>
+      </div>
+    </div>
+
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

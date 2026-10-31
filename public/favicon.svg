@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Monster icon">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2de1c2"/>
+      <stop offset="1" stop-color="#4a2fbd"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.44" r="0.62">
+      <stop offset="0" stop-color="#d6fff6" stop-opacity="0.17"/>
+      <stop offset="1" stop-color="#d6fff6" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#a0f8b6"/>
+      <stop offset="0.35" stop-color="#7ef29a"/>
+      <stop offset="1" stop-color="#63e286"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <rect width="512" height="512" fill="url(#glow)"/>
+  <g fill="#fff6a8" opacity="0.92">
+    <path d="M64 58.37 Q68.13 70.11 79.87 74.24 Q68.13 78.37 64 90.11 Q59.87 78.37 48.13 74.24 Q59.87 70.11 64 58.37Z"/>
+    <path d="M437.76 39.42 Q440.82 48.14 449.54 51.2 Q440.82 54.26 437.76 62.98 Q434.70 54.26 425.98 51.2 Q434.70 48.14 437.76 39.42Z"/>
+    <path d="M453.12 382.98 Q456.71 393.21 466.94 396.8 Q456.71 400.39 453.12 410.62 Q449.53 400.39 439.30 396.8 Q449.53 393.21 453.12 382.98Z"/>
+    <path d="M58.88 422.40 Q61.54 429.98 69.12 432.64 Q61.54 435.30 58.88 442.88 Q56.22 435.30 48.64 432.64 Q56.22 429.98 58.88 422.40Z"/>
+    <path d="M366.08 460.80 Q368.08 466.48 373.76 468.48 Q368.08 470.48 366.08 476.16 Q364.08 470.48 358.40 468.48 Q364.08 466.48 366.08 460.80Z"/>
+  </g>
+  <g fill="#ff6b9d" stroke="#ff6b9d" stroke-linejoin="round">
+    <path d="M156.67 180.22 L154.62 103.94 L217.09 154.62Z" stroke-width="22.53" stroke-linejoin="round"/>
+    <path d="M355.33 180.22 L357.38 103.94 L294.91 154.62Z" stroke-width="22.53" stroke-linejoin="round"/>
+  </g>
+  <ellipse cx="256" cy="268.8" rx="164.61" ry="144.13" fill="#2c9c63"/>
+  <ellipse cx="256" cy="268.8" rx="156.16" ry="135.68" fill="url(#body)"/>
+  <g>
+    <ellipse cx="151.04" cy="307.2" rx="31.74" ry="17.92" fill="#ff5f9d" opacity="0.7"/>
+    <ellipse cx="360.96" cy="307.2" rx="31.74" ry="17.92" fill="#ff5f9d" opacity="0.7"/>
+  </g>
+    <ellipse cx="196.1" cy="240.64" rx="41.47" ry="54.27" fill="#ffffff"/>
+    <ellipse cx="202.75" cy="251.9" rx="25.09" ry="31.74" fill="#1b1140"/>
+    <circle cx="189.95" cy="229.89" r="10.5" fill="#ffffff" opacity="0.95"/>
+    <ellipse cx="315.9" cy="240.64" rx="41.47" ry="54.27" fill="#ffffff"/>
+    <ellipse cx="309.25" cy="251.9" rx="25.09" ry="31.74" fill="#1b1140"/>
+    <circle cx="297.98" cy="229.89" r="10.5" fill="#ffffff" opacity="0.95"/>
+  <path d="M286.36 306.51 A53.76 53.76 0 0 1 225.64 306.51" fill="none" stroke="#1b1140" stroke-width="18.43" stroke-linecap="round"/>
+</svg>

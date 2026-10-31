@@ -1,0 +1,16 @@
+{
+  "name": "Monster Hunt AR",
+  "short_name": "Monster Hunt",
+  "description": "Friendly monsters are hiding inside your house. Find them, befriend them, collect them all!",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#1b1140",
+  "theme_color": "#1b1140",
+  "icons": [
+    { "src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
