@@ -57,8 +57,11 @@ export interface LabelItem {
 }
 
 export interface RadarItem {
+  /** 0 = straight ahead, positive = to her right (see `sideAngle` in main). */
   angle: number;
   dist: number;
+  /** She is looking straight at it right now. */
+  inView: boolean;
   icon: string;
   rarity: Rarity;
   shiny: boolean;
@@ -206,6 +209,15 @@ export class Ui {
     this.hintUntil = performance.now() / 1000 + hold;
   }
 
+  /**
+   * True while a hint is deliberately being held up. The ambient chatter runs
+   * every quarter second and would otherwise wipe a hint she just earned — the
+   * one piece of feedback that says "that thing you did worked".
+   */
+  hintBusy() {
+    return this.hintUntil > performance.now() / 1000;
+  }
+
   expireHint(fallback: string) {
     if (this.hintUntil > 0 && performance.now() / 1000 > this.hintUntil) {
       this.hintUntil = 0;
@@ -270,6 +282,12 @@ export class Ui {
       let node = this.labelPool.get(it.uid);
       if (!node) {
         node = make('div', 'mon-label');
+        // The tag is a tap target, not a caption: the game resolves the monster
+        // behind it from this uid. It is also the one part of a monster that is
+        // never behind the buttons along the bottom of the screen.
+        node.dataset.uid = String(it.uid);
+        node.setAttribute('role', 'button');
+        node.setAttribute('aria-label', `Throw at ${it.name}`);
         const dot = make('span', 'dot', it.icon);
         dot.style.background = it.color;
         node.appendChild(dot);
@@ -310,6 +328,14 @@ export class Ui {
   /* radar ribbon                                                      */
   /* ---------------------------------------------------------------- */
 
+  /**
+   * Blips across the strip, where angle 0 is straight ahead and positive is her
+   * right. The mapping is deliberately not linear in angle: a phone only shows
+   * about 35° of the room at a time, so spreading the full ±180° turn over this
+   * strip squeezes everything she can actually see into the middle tenth and the
+   * radar reads as empty. A gentle curve gives the middle of the strip as much
+   * room as the ends, and a monster behind her still lands on the far side.
+   */
   radar(items: RadarItem[]) {
     while (this.blipPool.length < items.length) {
       const b = make('div', 'blip');
@@ -321,16 +347,19 @@ export class Ui {
       const it = items[i];
       if (!it) {
         b.style.opacity = '0';
+        b.classList.remove('view');
         continue;
       }
-      const side = Math.max(-1, Math.min(1, it.angle / (Math.PI * 0.8)));
-      const x = Math.sin((side * Math.PI) / 2) * 42;
+      const a = Math.max(-Math.PI, Math.min(Math.PI, it.angle));
+      const curve = Math.sign(a) * Math.pow(Math.abs(a) / Math.PI, 0.55);
+      b.style.left = `${(50 + curve * 46).toFixed(1)}%`;
       const lift = Math.min(1, it.dist / 12) * -13;
       b.style.opacity = String(Math.max(0.3, 1 - it.dist / 15));
-      b.style.transform = `translateX(${x.toFixed(1)}vw) translateY(${lift.toFixed(1)}px) scale(${(1.15 - Math.min(0.5, it.dist / 16)).toFixed(2)})`;
+      b.style.transform = `translateY(${lift.toFixed(1)}px) scale(${(1.15 - Math.min(0.5, it.dist / 16)).toFixed(2)})`;
       b.classList.toggle('shiny', it.shiny);
       if (!it.shiny) b.style.background = RARITY[it.rarity].color;
       b.classList.toggle('near', it.dist < 2.8);
+      b.classList.toggle('view', it.inView);
       if (b.textContent !== it.icon) b.textContent = it.icon;
     }
   }

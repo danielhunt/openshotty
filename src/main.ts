@@ -7,7 +7,7 @@
 
 import * as THREE from 'three';
 import { AudioEngine } from './core/audio';
-import { timeUniform } from './core/art';
+import { makeRing, timeUniform } from './core/art';
 import { MotionTracker } from './ar/motion';
 import { buildDreamland, buildLighting, RoomBackdrop } from './ar/room';
 import { Particles } from './fx/particles';
@@ -61,7 +61,7 @@ renderer.setClearAlpha(0);
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.05, 120);
-camera.position.set(0, 1.55, 0);
+camera.position.set(0, 1.32, 0);
 scene.add(buildLighting());
 
 const dream = buildDreamland();
@@ -73,6 +73,13 @@ const world = new World(scene, progress);
 const thrower = new OrbThrower(scene, particles, camera);
 const room = new RoomBackdrop(video);
 const motion = new MotionTracker({ walkSensitivity: progress.data.settings.walk, tiltSpeed: progress.data.settings.tilt });
+
+/** Hoop on the floor under whichever monster the lock plate is naming, so the
+ *  "who did the game pick" answer is drawn in the world instead of only in a
+ *  reticle that lives in the middle of the screen. */
+const lockRing = makeRing('#ffd93d');
+lockRing.visible = false;
+scene.add(lockRing);
 
 /* ------------------------------------------------------------------ */
 /* state                                                               */
@@ -517,7 +524,14 @@ function throwRay(clientX: number, clientY: number, out: THREE.Vector3) {
   return out;
 }
 
-function wantThrow(clientX: number, clientY: number) {
+/** The monster a tapped name tag belongs to; 0 when the tap was not a tag. */
+function tagUid(t: EventTarget | null) {
+  const raw = (t as HTMLElement | null)?.closest?.('.mon-label')?.getAttribute('data-uid');
+  const n = raw ? Number(raw) : 0;
+  return Number.isFinite(n) ? n : 0;
+}
+
+function wantThrow(clientX: number, clientY: number, pickedUid = 0) {
   if (mode !== 'play') return;
   if (thrower.busy) return;
   if (progress.data.orbs <= 0) {
@@ -526,9 +540,25 @@ function wantThrow(clientX: number, clientY: number) {
     audio.back();
     return;
   }
+
+  // A name tag is a tap target like the monster itself: it is the one part of a
+  // monster that is never hidden behind the buttons along the bottom.
+  const tagged = pickedUid
+    ? world.monsters.find((m) => m.uid === pickedUid && thrower.isLive(m)) ?? null
+    : null;
+  const target = tagged ?? thrower.pickAt(clientX, clientY, world.monsters);
+
+  if (!target && !thrower.anyInView(world.monsters)) {
+    // She tapped a blank wall. Do not charge her for the camera moving: an orb
+    // costs real time to regrow, and "the room was empty" is not a throw.
+    ui.hint('Nobody is in the picture — swing the phone around!', 2.4);
+    audio.back();
+    return;
+  }
+
   const dir = throwRay(clientX, clientY, new THREE.Vector3());
   const golden = goldenReady();
-  thrower.throwOrb(dir, world.monsters, golden, captureHooks);
+  thrower.throwOrb(dir, world.monsters, golden, captureHooks, target);
 }
 
 function goldenReady() {
@@ -560,8 +590,11 @@ window.addEventListener(
     lastPointerX = e.clientX;
     lastPointerY = e.clientY;
     pointerMoved += Math.abs(dx) + Math.abs(dy);
-    const relyOnDrag = !motion.haveOrientation || pointerMoved > 90;
-    if (relyOnDrag && mode === 'play') motion.addLook(dx, dy);
+    // Dragging is only a stand-in for a gyroscope (desktop, or an iPhone where
+    // motion was declined). When the real sensors are live the phone *is* the
+    // camera, so panning under her finger as she swings the device would double
+    // the motion and make the room swim. A tap still throws either way.
+    if (!motion.haveOrientation && mode === 'play') motion.addLook(dx, dy);
   },
   { passive: true },
 );
@@ -572,7 +605,7 @@ window.addEventListener(
     if (!pointerDown) return;
     pointerDown = false;
     const quick = performance.now() - pointerDownAt < 340;
-    if (quick && pointerMoved < 26 && !hitButton(pointerTarget)) wantThrow(e.clientX, e.clientY);
+    if (quick && pointerMoved < 26 && !hitButton(pointerTarget)) wantThrow(e.clientX, e.clientY, tagUid(pointerTarget));
   },
   { passive: true },
 );
@@ -916,17 +949,52 @@ motion.onStepDetected = (stride) => {
 /* ------------------------------------------------------------------ */
 
 const projected = new THREE.Vector3();
-const flat = new THREE.Vector3();
 const fwdFlat = new THREE.Vector3();
+
+/**
+ * Signed horizontal angle from where she is looking to a floor point, in
+ * radians: 0 is straight ahead and positive is to HER RIGHT. The obvious
+ * `atan2(x, z) - yaw` is a compass bearing, which grows the other way, and that
+ * mirror is exactly what made the radar feel backwards.
+ */
+function sideAngle(x: number, z: number, from: THREE.Vector3, fwd: THREE.Vector3) {
+  const dx = x - from.x;
+  const dz = z - from.z;
+  // right-hand direction in the floor plane: forward turned a quarter turn
+  return Math.atan2(dx * -fwd.z + dz * fwd.x, dx * fwd.x + dz * fwd.z);
+}
+
+/** Half of the horizontal field of view, in radians: how wide the picture is. */
+function halfViewAngle() {
+  return Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect);
+}
+
+/** Gold hoop under the monster the lock plate is naming. */
+function updateLockRing() {
+  const target = thrower.aimTarget(world.monsters);
+  if (!target) {
+    lockRing.visible = false;
+    return;
+  }
+  const c = target.center;
+  lockRing.visible = true;
+  lockRing.position.set(c.x, 0.035, c.z);
+  // a gentle pulse reads as "this one is mine to throw at" without hiding it
+  const r = Math.max(0.3, target.radius * 1.85) * (1 + Math.sin(time * 4.5) * 0.06);
+  lockRing.scale.setScalar(r);
+}
 
 function updateLabels() {
   const items: { uid: number; x: number; y: number; name: string; icon: string; color: string; spotted: boolean; isNew: boolean }[] = [];
-  const radar: { angle: number; dist: number; icon: string; rarity: Rarity; shiny: boolean }[] = [];
+  const radar: { angle: number; dist: number; inView: boolean; icon: string; rarity: Rarity; shiny: boolean }[] = [];
   fwdFlat.set(0, 0, -1).applyQuaternion(camera.quaternion);
   fwdFlat.y = 0;
   if (fwdFlat.lengthSq() < 1e-6) fwdFlat.set(0, 0, -1);
   fwdFlat.normalize();
-  const yaw = Math.atan2(fwdFlat.x, fwdFlat.z);
+
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  const halfView = halfViewAngle();
 
   const scored = world.monsters
     .map((m) => ({ m, dist: Math.hypot(m.pos.x - camera.position.x, m.pos.z - camera.position.z) }))
@@ -934,25 +1002,32 @@ function updateLabels() {
     .sort((a, b) => a.dist - b.dist);
 
   for (const { m, dist } of scored) {
-    let angle = Math.atan2(m.pos.x - camera.position.x, m.pos.z - camera.position.z) - yaw;
-    while (angle > Math.PI) angle -= Math.PI * 2;
-    while (angle < -Math.PI) angle += Math.PI * 2;
+    const angle = sideAngle(m.pos.x, m.pos.z, camera.position, fwdFlat);
+    // is she actually looking at it? the radar says so, and so does the ring
+    const inView = dist > 0.3 && dist < 12 && Math.abs(angle) < halfView + 0.1 && camera.position.distanceTo(m.center) < 12;
     radar.push({
       angle,
       dist,
+      inView,
       icon: ELEMENTS[m.species.element]?.icon ?? '⭐️',
       rarity: m.species.rarity,
       shiny: m.shiny,
     });
     if (Math.abs(angle) > 0.85 || dist > 9 || dist < 0.35) continue;
 
-    projected.copy(m.center);
-    projected.y += 0.12;
+    // tag above the head, where it never covers the monster's face
+    projected.set(m.pos.x, m.pos.y + m.creature.height + m.hover + 0.14, m.pos.z);
     projected.project(camera);
     if (projected.z > 1) continue;
-    const x = (projected.x * 0.5 + 0.5) * window.innerWidth;
-    const y = (-projected.y * 0.5 + 0.5) * window.innerHeight;
-    if (x < 40 || x > window.innerWidth - 40 || y < 90 || y > window.innerHeight - 210) continue;
+    const rawX = (projected.x * 0.5 + 0.5) * w;
+    const rawY = (-projected.y * 0.5 + 0.5) * h;
+    // A tag is a tap target now, so it is nudged into the safe band instead of
+    // being dropped: a monster at the very edge of the picture used to get no
+    // tag at all, and one low in the frame lost its tag behind the buttons.
+    // Only while it is genuinely in the picture, not once the camera swings off.
+    if (rawX < -72 || rawX > w + 72 || rawY < -40 || rawY > h + 40) continue;
+    const x = THREE.MathUtils.clamp(rawX, 66, w - 66);
+    const y = THREE.MathUtils.clamp(rawY, 104, h - 214);
     items.push({
       uid: m.uid,
       x,
@@ -967,19 +1042,18 @@ function updateLabels() {
 
   ui.labels(items);
   ui.radar(radar.slice(0, 6));
+  updateLockRing();
 }
 
 function ambientHint() {
-  if (mode !== 'play') return;
+  // never talk over a hint she just earned; the next beat is plenty
+  if (ui.hintBusy()) return;
   const { monster, dist } = world.nearest(camera.position);
   if (!monster) {
     ui.expireHint('Look around — monsters hide in corners!');
     return;
   }
-  let angle = Math.atan2(monster.pos.x - camera.position.x, monster.pos.z - camera.position.z);
-  angle -= yawOf();
-  while (angle > Math.PI) angle -= Math.PI * 2;
-  while (angle < -Math.PI) angle += Math.PI * 2;
+  const angle = sideAngle(monster.pos.x, monster.pos.z, camera.position, fwdFlat);
   if (Math.abs(angle) > 1) {
     ui.hint(angle > 0 ? 'Something is that way →' : '← Something is that way', 1.6);
   } else if (dist > 6) {
@@ -987,12 +1061,6 @@ function ambientHint() {
   } else {
     ui.expireHint('Tap a monster to throw an orb');
   }
-}
-
-function yawOf() {
-  flat.set(0, 0, -1).applyQuaternion(camera.quaternion);
-  flat.y = 0;
-  return Math.atan2(flat.x, flat.z);
 }
 
 /* ------------------------------------------------------------------ */
@@ -1077,6 +1145,8 @@ function frame(now: number) {
 
     const intensity = thrower.busy ? 0.95 : Math.min(0.8, world.monsters.length * 0.16);
     audio.tickMusic(intensity);
+  } else {
+    lockRing.visible = false;
   }
 
   if (dreamMode && dream.group.visible) dream.update(time);
@@ -1097,7 +1167,12 @@ function frame(now: number) {
   requestAnimationFrame(frame);
 }
 
-const EYE_HEIGHT = 1.55;
+/**
+ * Eye height in metres. This is her height, not an adult's: the world is
+ * authored to be seen from about 1.32 m, which is what it feels like to hold a
+ * phone up at a monster when you are seven.
+ */
+const EYE_HEIGHT = 1.32;
 const baseQuat = new THREE.Quaternion();
 const shakeQuat = new THREE.Quaternion();
 const shakeEuler = new THREE.Euler();
