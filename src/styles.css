@@ -147,7 +147,9 @@ body.dream #camera-feed {
   position: absolute;
   transform: translate(-50%, -50%) scale(0.9);
   opacity: 0;
-  transition: opacity 0.25s ease;
+  transition:
+    opacity 0.25s ease,
+    transform 0.18s ease-out;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -159,11 +161,31 @@ body.dream #camera-feed {
   -webkit-backdrop-filter: blur(8px) saturate(1.3);
   box-shadow: 0 4px 14px rgba(12, 5, 34, 0.4);
   white-space: nowrap;
-  font-size: 14px;
+  font-size: 15px;
+  /* The tag is a button, not a caption. A 7-year-old aims with a fingertip, and
+     this is the one part of a monster that is never sitting behind the Capture
+     and Roar buttons, so it has to be big enough to hit and answer when hit.
+     44px is Apple's own minimum target; the size must be spent where the finger
+     lands, so nothing here is left to a transform that shrinks the hit box. */
+  pointer-events: auto;
+  min-height: 44px;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
+.mon-label:active {
+  transform: translate(-50%, -50%) scale(1.04);
+  border-color: var(--sun);
+}
+
+/* full size once shown; `scale(0.9)` above is only the hide-away state, and
+   leaving it here would freeze every visible tag at 90% of its hit area */
 .mon-label.on {
   opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
 }
 
 .mon-label.spot {
@@ -806,8 +828,8 @@ body.dream #camera-feed {
 .blip {
   position: absolute;
   /* Centre-anchored: ahead is the middle line of the strip, and a blip slides
-     left or right as the monster goes off to a side. Without this the blips
-     start at the left edge and the whole radar reads as empty. */
+     left or right as the monster goes off to a side. The game writes `left`
+     directly (never translateX), so this is the property that must animate. */
   left: 50%;
   top: 50%;
   width: 26px;
@@ -820,7 +842,13 @@ body.dream #camera-feed {
   color: var(--ink);
   background: var(--lime);
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18), 0 3px 10px rgba(0, 0, 0, 0.4);
-  transition: opacity 0.25s ease;
+  transition: left 0.28s ease-out, opacity 0.25s ease;
+}
+
+/* the blips inside the picture get a gold ring, so the strip answers
+   "which of these can I actually hit right now" at a glance */
+.blip.view {
+  box-shadow: 0 0 0 3px var(--sun), 0 0 14px rgba(255, 217, 61, 0.75), 0 3px 10px rgba(0, 0, 0, 0.4);
 }
 
 .blip.near {
@@ -829,6 +857,15 @@ body.dream #camera-feed {
 
 @keyframes blip-pulse {
   50% { box-shadow: 0 0 0 7px rgba(255, 255, 255, 0.12), 0 3px 10px rgba(0, 0, 0, 0.4); }
+}
+
+/* near and in shot: keep the gold ring while it pulses */
+.blip.view.near {
+  animation: blip-pulse-view 1.1s ease-in-out infinite;
+}
+
+@keyframes blip-pulse-view {
+  50% { box-shadow: 0 0 0 3px var(--sun), 0 0 0 9px rgba(255, 217, 61, 0.3), 0 3px 10px rgba(0, 0, 0, 0.4); }
 }
 
 .blip.shiny {

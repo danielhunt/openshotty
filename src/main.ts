@@ -1026,8 +1026,8 @@ function updateLabels() {
     // tag at all, and one low in the frame lost its tag behind the buttons.
     // Only while it is genuinely in the picture, not once the camera swings off.
     if (rawX < -72 || rawX > w + 72 || rawY < -40 || rawY > h + 40) continue;
-    const x = THREE.MathUtils.clamp(rawX, 66, w - 66);
-    const y = THREE.MathUtils.clamp(rawY, 104, h - 214);
+    const x = THREE.MathUtils.clamp(rawX, TAG_EDGE_X, w - TAG_EDGE_X);
+    const y = THREE.MathUtils.clamp(rawY, TAG_TOP, h - TAG_BOTTOM_GAP);
     items.push({
       uid: m.uid,
       x,
@@ -1173,6 +1173,17 @@ function frame(now: number) {
  * phone up at a monster when you are seven.
  */
 const EYE_HEIGHT = 1.32;
+
+/**
+ * Where a name tag is allowed to sit. A tag is a finger target, not a caption,
+ * so it is pushed into a band that is clear of the HUD rather than dropped: the
+ * top of the band starts below the radar strip (which ends near 118px) by half
+ * a 44px tag, and the bottom stops above the Capture and Roar buttons. The sides
+ * keep the pill fully on screen so a monster at the edge is still throwable.
+ */
+const TAG_EDGE_X = 66;
+const TAG_TOP = 142;
+const TAG_BOTTOM_GAP = 214;
 const baseQuat = new THREE.Quaternion();
 const shakeQuat = new THREE.Quaternion();
 const shakeEuler = new THREE.Euler();
